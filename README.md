@@ -1,5 +1,7 @@
 # Automated Trading Agent with Market Monitoring
 
+TESTING THE UTILITY OF ANTHROPICS Opus 5.5: Creating an application that will analize  markets utilizing synthetic data.
+
 A rules-based day-trading bot for **Interactive Brokers** that trades **US stocks and crypto**,
 supervised by an AI agent (Claude) that checks on it on a schedule.
 
