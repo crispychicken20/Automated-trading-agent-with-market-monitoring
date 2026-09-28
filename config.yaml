@@ -1,0 +1,56 @@
+# Trading bot configuration.
+# Every value here is a hard limit enforced in code. The supervising agent may
+# only change values inside the ranges listed in CLAUDE.md.
+
+ibkr:
+  host: 127.0.0.1
+  # 7497 = TWS paper, 4002 = IB Gateway paper.
+  # 7496 / 4001 are LIVE ports and are refused unless allow_live is true.
+  port: 7497
+  client_id: 17
+  allow_live: false
+
+markets:
+  stocks:
+    enabled: true
+    symbols: [SPY, QQQ, AAPL, MSFT, NVDA]
+    exchange: SMART
+    currency: USD
+    bar_size: "5 mins"
+    history: "2 D"
+    # Close all stock positions this many minutes before the 16:00 ET close.
+    flatten_minutes_before_close: 10
+  crypto:
+    enabled: true
+    # IBKR crypto trades through Paxos. Long-only (IBKR does not allow shorting crypto).
+    symbols: [BTC, ETH]
+    exchange: PAXOS
+    currency: USD
+    bar_size: "5 mins"
+    history: "2 D"
+    qty_decimals: 4
+
+strategy:
+  # EMA crossover with a volume filter and an RSI guard.
+  fast_ema: 9
+  slow_ema: 21
+  volume_lookback: 20
+  volume_multiplier: 1.5   # entry bar volume must exceed this x average volume
+  rsi_period: 14
+  rsi_max_entry: 70        # skip entries when RSI is above this (overbought)
+
+risk:
+  max_position_usd: 1000        # dollars committed per new position
+  max_open_positions: 4         # across stocks and crypto
+  stop_loss_pct: 1.5            # exit if price falls this % below entry
+  take_profit_pct: 3.0          # exit if price rises this % above entry
+  daily_loss_limit_usd: 300     # halt new entries and flatten when breached
+  max_trades_per_day: 20
+  max_stock_day_trades_5d: 3    # pattern-day-trader guard; set higher only if your account allows it
+  slippage_bps: 10              # limit-price offset used to make orders marketable
+
+engine:
+  poll_seconds: 60
+  kill_switch_file: KILL        # create this file to flatten everything and stop
+  journal_path: data/journal.sqlite
+  reports_dir: reports
