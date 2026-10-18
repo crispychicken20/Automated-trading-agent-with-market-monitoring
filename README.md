@@ -48,6 +48,10 @@ All numbers are in `config.yaml`.
 
 ### Risk controls (enforced in code)
 
+- **Total budget** (`max_total_budget_usd`): the most money that can be in open positions at
+  once, counted at cost. When less than a full position's worth is left, new positions shrink
+  to fit, and below 10% of a position no new ones open. **Only you can raise it.** A Claude Code
+  hook (`.claude/hooks/guard_budget.py`) blocks the agent from raising or removing it.
 - Max dollars per position and max number of open positions
 - **Daily loss limit**: when breached, the bot stops opening positions and closes everything
 - Max trades per day

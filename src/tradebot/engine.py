@@ -50,6 +50,7 @@ class Engine:
         self.risk = RiskManager(cfg.risk)
         self.clock = clock
         self.halted_day = None
+        self.committed_usd = 0.0
 
     # ---- main loop -------------------------------------------------------
 
@@ -101,6 +102,7 @@ class Engine:
             return
 
         open_count = len(positions)
+        self.committed_usd = sum(abs(p.qty) * p.avg_cost for p in positions.values())
         for market in ("stocks", "crypto"):
             mcfg = self.cfg.market(market)
             if not mcfg.enabled:
@@ -145,17 +147,28 @@ class Engine:
             stock_day_trades_5d=self.journal.stock_day_trades(
                 self.journal.business_days_ago(day, 4)
             ),
+            committed_usd=self.committed_usd,
         )
         ok, why = self.risk.can_open(state, market)
         if not ok:
             self.journal.event("blocked", f"buy signal blocked: {why}", symbol, signal=sig.reason)
             return 0
-        # Size on the limit price so the position never exceeds max_position_usd.
-        qty = self.risk.position_size(self.risk.limit_price("BUY", price), mcfg.qty_decimals)
+        # Size on the limit price so the position never exceeds max_position_usd
+        # or the remaining total budget.
+        limit = self.risk.limit_price("BUY", price)
+        qty = self.risk.position_size(limit, mcfg.qty_decimals, self.committed_usd)
         if qty <= 0:
-            self.journal.event("blocked", f"position size is zero at price {price}", symbol)
+            self.journal.event(
+                "blocked",
+                f"position size is zero at price {price} "
+                f"(remaining budget ${self.risk.remaining_budget(self.committed_usd):,.2f})",
+                symbol,
+            )
             return 0
-        return 1 if self.order(symbol, market, "BUY", qty, price, sig.reason) else 0
+        if not self.order(symbol, market, "BUY", qty, price, sig.reason):
+            return 0
+        self.committed_usd += qty * limit
+        return 1
 
     # ---- orders ----------------------------------------------------------
 
@@ -163,7 +176,10 @@ class Engine:
         if price is None:
             bars = self.broker.bars(pos.symbol, pos.market)
             price = float(bars["close"].iloc[-1]) if not bars.empty else pos.avg_cost
-        return self.order(pos.symbol, pos.market, "SELL", abs(pos.qty), price, reason)
+        if not self.order(pos.symbol, pos.market, "SELL", abs(pos.qty), price, reason):
+            return False
+        self.committed_usd = max(0.0, self.committed_usd - abs(pos.qty) * pos.avg_cost)
+        return True
 
     def order(self, symbol, market, side, qty, price, reason) -> bool:
         limit = self.risk.limit_price(side, price)

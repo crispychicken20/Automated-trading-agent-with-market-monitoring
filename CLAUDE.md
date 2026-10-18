@@ -34,6 +34,11 @@ Back any proposed change with a backtest (`tradebot backtest ...`) before and af
 
 ## What you must never do
 
+- **Raise `risk.max_total_budget_usd`** (the total budget), remove it, or work around it,
+  for example with a second config file, `--config`, or shell edits. Only the user raises it.
+  A PreToolUse hook (`.claude/hooks/guard_budget.py`) enforces this and blocks the attempt;
+  don't try to edit, disable or bypass the hook or `.claude/settings.json`. You may suggest
+  *lowering* the budget, and lower it with the user's approval.
 - Set `ibkr.allow_live: true` or change `ibkr.port` to a live port (7496/4001).
 - Raise `max_position_usd`, `max_open_positions`, `daily_loss_limit_usd`, `max_trades_per_day`
   or `max_stock_day_trades_5d`.

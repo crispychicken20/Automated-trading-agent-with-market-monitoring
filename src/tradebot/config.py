@@ -42,6 +42,7 @@ class StrategyConfig:
 
 @dataclass
 class RiskConfig:
+    max_total_budget_usd: float = 4000
     max_position_usd: float = 1000
     max_open_positions: int = 4
     stop_loss_pct: float = 1.5
@@ -97,9 +98,14 @@ def validate(cfg: Config) -> None:
     s, r = cfg.strategy, cfg.risk
     if s.fast_ema >= s.slow_ema:
         errors.append("strategy.fast_ema must be smaller than strategy.slow_ema")
-    for name in ("max_position_usd", "stop_loss_pct", "take_profit_pct", "daily_loss_limit_usd"):
+    for name in (
+        "max_total_budget_usd", "max_position_usd", "stop_loss_pct", "take_profit_pct",
+        "daily_loss_limit_usd",
+    ):
         if getattr(r, name) <= 0:
             errors.append(f"risk.{name} must be positive")
+    if r.max_position_usd > r.max_total_budget_usd:
+        errors.append("risk.max_position_usd cannot be larger than risk.max_total_budget_usd")
     if r.max_open_positions < 1:
         errors.append("risk.max_open_positions must be at least 1")
     if errors:

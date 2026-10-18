@@ -40,6 +40,10 @@ strategy:
   rsi_max_entry: 70        # skip entries when RSI is above this (overbought)
 
 risk:
+  # TOTAL BUDGET: the most money the bot may have in open positions at once (at cost).
+  # Only you may raise this. The supervising agent is blocked from increasing it
+  # (see CLAUDE.md and .claude/hooks/guard_budget.py).
+  max_total_budget_usd: 4000
   max_position_usd: 1000        # dollars committed per new position
   max_open_positions: 4         # across stocks and crypto
   stop_loss_pct: 1.5            # exit if price falls this % below entry

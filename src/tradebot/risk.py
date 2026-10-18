@@ -7,6 +7,8 @@ from dataclasses import dataclass
 
 from .config import RiskConfig
 
+MIN_POSITION_FRACTION = 0.1  # smallest new position, as a share of max_position_usd
+
 
 @dataclass
 class AccountState:
@@ -14,6 +16,7 @@ class AccountState:
     trades_today: int
     daily_pnl: float
     stock_day_trades_5d: int
+    committed_usd: float = 0.0  # cost basis of all open positions
 
 
 class RiskManager:
@@ -23,7 +26,17 @@ class RiskManager:
     def daily_loss_breached(self, daily_pnl: float) -> bool:
         return daily_pnl <= -self.cfg.daily_loss_limit_usd
 
+    def remaining_budget(self, committed_usd: float) -> float:
+        return max(0.0, self.cfg.max_total_budget_usd - committed_usd)
+
     def can_open(self, state: AccountState, market: str) -> tuple[bool, str]:
+        # Don't open tiny leftover positions with the last scraps of the budget.
+        min_position = MIN_POSITION_FRACTION * self.cfg.max_position_usd
+        if self.remaining_budget(state.committed_usd) < min_position:
+            return False, (
+                f"total budget used up (${state.committed_usd:,.2f} of "
+                f"${self.cfg.max_total_budget_usd:,.2f} committed)"
+            )
         if self.daily_loss_breached(state.daily_pnl):
             return False, f"daily loss limit reached ({state.daily_pnl:.2f})"
         if state.open_positions >= self.cfg.max_open_positions:
@@ -39,12 +52,16 @@ class RiskManager:
             )
         return True, "ok"
 
-    def position_size(self, price: float, qty_decimals: int = 0) -> float:
-        """Quantity to buy so the position is at most max_position_usd."""
+    def position_size(
+        self, price: float, qty_decimals: int = 0, committed_usd: float = 0.0
+    ) -> float:
+        """Quantity to buy so the position is at most max_position_usd and the total
+        committed stays within max_total_budget_usd."""
         if price <= 0:
             return 0
+        dollars = min(self.cfg.max_position_usd, self.remaining_budget(committed_usd))
         step = 10 ** -qty_decimals
-        qty = math.floor(self.cfg.max_position_usd / price / step) * step
+        qty = math.floor(dollars / price / step) * step
         return round(qty, qty_decimals)
 
     def limit_price(self, side: str, price: float) -> float:
